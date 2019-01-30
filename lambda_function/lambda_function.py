@@ -89,6 +89,8 @@ def evaluateInput(encoder, decoder, searcher, voc, sentence):
 
     except KeyError:
         print("i don't know what you mean")
+        
+    return(' '.join(output_words))
 
 def build_model():
     # Configure models
@@ -128,7 +130,7 @@ def build_model():
     encoder = encoder.to(device)
     decoder = decoder.to(device)
     print('Models built and ready to go!')
-    return(encoder, decoder)
+    return(encoder, decoder, voc)
 
 def chatbot(input_text):
     s3 = boto3.client('s3')
@@ -136,10 +138,13 @@ def chatbot(input_text):
     if os.path.isfile('/tmp/' + MODEL_NAME) != True:
         try:
             s3.download_file('chatbot-mark', 'chatbot-model/' + MODEL_NAME, '/tmp/' + MODEL_NAME)
-        except ClientError:
-            print('bla')
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == "404":
+            	print("The object does not exist")
+            else:
+            	raise
     
-    encoder, decoder = build_model()
+    encoder, decoder, voc = build_model()
     
     # Set dropout layers to eval mode
     encoder.eval()
@@ -217,8 +222,10 @@ def lambda_handler(event, context):
         # Get the text of the message the user sent to the bot,
         # and reverse it.
         text = slack_event["text"]
+        print(text)
         #reversed_text = 'I do not understand this, ' + text
         bot_text = chatbot(text)
+        print(bot_text)
         # Get the ID of the channel where the message was posted.
         channel_id = slack_event["channel"]
 
